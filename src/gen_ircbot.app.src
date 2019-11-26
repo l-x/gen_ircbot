@@ -1,0 +1,15 @@
+{application, gen_ircbot,
+ [{description, "A simple behaviour for building irc bots"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, [ssl]},
+
+  {maintainers, []},
+  {licenses, ["WTFPL"]},
+  {links, []}
+ ]}.
