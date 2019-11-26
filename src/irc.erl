@@ -77,7 +77,7 @@ connect_socket(#{host := Host, port := Port} = Server) ->
 
     case SocketMod:connect(Host, Port, ?SOCKET_OPTS) of
         {ok, Socket} ->
-            {ok, {gen_tcp, Socket}};
+            {ok, {SocketMod, Socket}};
         {error, _Reason} -> % @todo Implement better backoff strategy with a max. retry count
             timer:sleep(15000),
             connect_socket(Server)
