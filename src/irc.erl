@@ -8,7 +8,7 @@
 
 %% API exports
 -export([connect/1, send/2, ping/2, pong/2, nick/2, join/2, part/3, privmsg/3]).
--export_type([server/0, connection/0]).
+-export_type([server/0, connection/0, reply_to/0]).
 
 %% API types and records
 -type server() :: #{
@@ -24,6 +24,7 @@
 }.
 
 -opaque connection() :: {SocketMod :: gen_tcp | ssl, Socket :: gen_tcp:socket() | ssl:socket()}.
+-type reply_to() :: {Type :: direct, BotNick :: nonempty_string(), Sender :: nonempty_string()} | {Type :: channel, Channel :: nonempty_string(), Sender :: nonempty_string()}.
 
 %% Internal types and records
 

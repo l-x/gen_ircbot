@@ -28,7 +28,14 @@
     State :: mod_state()
 ) -> {ok, mod_state()}.
 
-%callback handle_command() -> {ok, mod_state()}
+-callback handle_command(
+    Command :: nonempty_string(), 
+    Params :: undefined | nonempty_string(), 
+    ReplyTo :: irc:reply_to(), 
+    State :: mod_state()
+) -> {ok, mod_state()}.
+
+-optional_callbacks([handle_message/5]).
 
 %%====================================================================
 %% gen_server functions
@@ -62,10 +69,13 @@ handle_cast({part, Channel, Reason}, State) ->
 handle_cast({privmsg, Target, Message}, State) ->
     irc:privmsg(State#state.connection, Target, Message),
     {noreply, State};
-handle_cast({reply, {_Command, [Target|_], _Trail, {Sender, _, _}}, Reply}, State) ->
-    case maps:get(nickname, State#state.server) of
-        Target -> irc:privmsg(State#state.connection, Sender, Reply);
-        _ -> irc:privmsg(State#state.connection, Target, io_lib:format("~s: ~s", [Sender, Reply]))
+handle_cast({reply, ReplyTo, Message}, State) ->
+    OwnNick = maps:get(nickname, State#state.server),
+
+    case ReplyTo of
+        {direct, OwnNick, Sender} -> irc:privmsg(State#state.connection, Sender, Message);
+        {channel, Channel, Sender} -> irc:privmsg(State#state.connection, Channel, io_lib:format("~s: ~s", [Sender, Message]));
+        _ -> ok % ignore
     end,
     {noreply, State};
 handle_cast(_Message, State) ->
@@ -106,10 +116,10 @@ channels(Server) ->
 privmsg(Server, Target, Message) ->
     gen_server:call(Server, {privmsg, Target, Message}).
 
-reply(Server, {"PRIVMSG", _Params, _, _Prefix} = Message, Reply) ->
-    gen_server:cast(Server, {reply, Message, Reply});
-reply(_, _, _) ->
-    {error, badmessage}.
+-spec reply(Server :: term(), ReplyTo :: irc:reply_to(), Message :: nonempty_string()) -> ok.
+reply(Server, ReplyTo, Message) ->
+    gen_server:cast(Server, {reply, ReplyTo, Message}).
+
 %%====================================================================
 %% Internal functions
 %%====================================================================
@@ -124,8 +134,7 @@ dispatch_messages([], State) ->
 
 dispatch_message(Message, State) ->
     try_handle_botcommand(
-        bot_command:parse(Message),
-        Message,
+        bot_command:parse(Message, maps:get(nickname, State#state.server)),
         try_handle_message(
             Message,
             handle_vital_messages(Message, State)
@@ -152,16 +161,18 @@ handle_vital_messages(_Message, State) ->
     State.
 
 try_handle_message({Command, Params, Trail, Prefix}, #state{mod = Mod, mod_state = ModState} = State) ->
-    {ok, NewModState} = Mod:handle_message(Command, Params, Trail, Prefix, ModState),
-    State#state{mod_state = NewModState}.
-
-try_handle_botcommand({Command, Params}, Message, #state{mod = Mod, mod_state = ModState} = State) ->
-    case erlang:function_exported(Mod, handle_command, 4) of
-        false -> 
-            State;
+    case erlang:function_exported(Mod, handle_message, 5) of
+        false -> State;
         true ->
-            {ok, NewModState} = Mod:handle_command(Command, Params, Message, ModState),
-            State#state{mod_state = NewModState}
+            case catch Mod:handle_message(Command, Params, Trail, Prefix, ModState) of
+                {ok, NewModState} -> State#state{mod_state = NewModState};
+                {'EXIT', {function_clause, _}} -> State
+            end
+    end.
+try_handle_botcommand({Command, Params, ReplyTo}, #state{mod = Mod, mod_state = ModState} = State) ->
+    case catch Mod:handle_command(Command, Params, ReplyTo, ModState) of
+        {ok, NewModState} -> State#state{mod_state = NewModState};
+        {'EXIT', {function_clause, _}} -> State
     end;
-try_handle_botcommand(_, _Message, State) ->
+try_handle_botcommand(_, State) ->
     State.
