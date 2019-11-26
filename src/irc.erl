@@ -39,7 +39,6 @@ connect(Server) ->
 
 -spec send(Connection :: connection(), Data :: nonempty_string()) -> ok.
 send({SocketMod, Socket}, Data) ->
-    io:format("--> ~s~n", [Data]),
     SocketMod:send(Socket, Data ++ ?IRC_CRLF).
 
 -spec ping(Connection :: connection(), Server :: nonempty_string()) ->ok.
@@ -70,7 +69,6 @@ privmsg(Connection, Target, Message) ->
 %% Internal functions
 %%====================================================================
 connect_socket(#{host := Host, port := Port} = Server) ->
-    io:format("Connecting to ~p~n", [Server]),
     SocketMod = case maps:get(ssl, Server, false) of
         true -> ssl;
         false -> gen_tcp
@@ -78,7 +76,6 @@ connect_socket(#{host := Host, port := Port} = Server) ->
 
     case SocketMod:connect(Host, Port, ?SOCKET_OPTS) of
         {ok, Socket} ->
-            io:format("Connected to ~p~n", [Server]),
             {ok, {gen_tcp, Socket}};
         {error, _Reason} -> % @todo Implement better backoff strategy with a max. retry count
             timer:sleep(15000),

@@ -123,7 +123,6 @@ dispatch_messages([], State) ->
     State.
 
 dispatch_message(Message, State) ->
-    io:format("<-- ~p~n", [Message]),
     try_handle_botcommand(
         bot_command:parse(Message),
         Message,
