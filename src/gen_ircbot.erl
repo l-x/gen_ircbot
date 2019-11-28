@@ -21,17 +21,17 @@
 -callback init(Args :: term()) -> {ok, mod_state()}.
 
 -callback handle_message(
-    Command :: nonempty_string(), 
-    Params :: [nonempty_string()], 
-    Trail :: undefined | nonempty_string(), 
+    Command :: nonempty_string(),
+    Params :: [nonempty_string()],
+    Trail :: undefined | nonempty_string(),
     Prefix :: {Nickname :: undefined | nonempty_string(), Username :: undefined | nonempty_string(), Host :: undefined | nonempty_string},
     State :: mod_state()
 ) -> {ok, mod_state()}.
 
 -callback handle_command(
-    Command :: nonempty_string(), 
-    Params :: undefined | nonempty_string(), 
-    ReplyTo :: irc:reply_to(), 
+    Command :: nonempty_string(),
+    Params :: undefined | nonempty_string(),
+    ReplyTo :: irc:reply_to(),
     State :: mod_state()
 ) -> {ok, mod_state()}.
 
@@ -85,8 +85,9 @@ handle_cast(_Message, State) ->
 handle_info({Event, _Socket, Message}, State) when Event == tcp; Event == ssl ->
     NewState = dispatch_messages(irc_message:parse(Message), State),
     {noreply, NewState};
-handle_info({Event, _Socket}, _State) when Event == tcp_closed; Event == ssl_closed ->
-    erlang:error(Event);
+handle_info({Event, _Socket}, State) when Event == tcp_closed; Event == ssl_closed ->
+    {ok, Connection} = irc:connect(State#state.server),
+    {noreply, State#state{connection = Connection}};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -126,7 +127,7 @@ reply(Server, ReplyTo, Message) ->
 
 dispatch_messages([Message|Messages], State) ->
     dispatch_messages(
-        Messages, 
+        Messages,
         dispatch_message(Message, State)
     );
 dispatch_messages([], State) ->
