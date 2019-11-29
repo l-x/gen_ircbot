@@ -1,5 +1,6 @@
 -module(gen_ircbot).
 -behaviour(gen_server).
+-include_lib("kernel/include/logger.hrl").
 
 %% gen_server exports
 -export([init/1, handle_call/3, handle_cast/2,  handle_info/2]).
@@ -86,6 +87,7 @@ handle_info({Event, _Socket, Message}, State) when Event == tcp; Event == ssl ->
     NewState = dispatch_messages(irc_message:parse(Message), State),
     {noreply, NewState};
 handle_info({Event, _Socket}, State) when Event == tcp_closed; Event == ssl_closed ->
+    ?LOG_WARNING("Socket closed, trying to reconnect"),
     {ok, Connection} = irc:connect(State#state.server),
     {noreply, State#state{connection = Connection}};
 handle_info(_Info, State) ->
@@ -97,6 +99,7 @@ handle_info(_Info, State) ->
 
 -spec start_link(Module :: module(), Server :: irc:server(), Args :: term()) -> {ok, Pid :: pid()} | {error, {already_started, Pid :: pid()}} | {error, Reason :: term()}.
 start_link(Module, Server, Args) ->
+    ?LOG_NOTICE("Starting ~tp", [Server]),
     gen_server:start_link(?MODULE, [Module, Server, Args], []).
 
 nick(Server) ->
@@ -134,6 +137,7 @@ dispatch_messages([], State) ->
     State.
 
 dispatch_message(Message, State) ->
+    ?LOG_NOTICE("<-- ~tp", [Message]),
     try_handle_botcommand(
         bot_command:parse(Message, maps:get(nickname, State#state.server)),
         try_handle_message(

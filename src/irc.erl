@@ -1,6 +1,7 @@
 %%% @private
 
 -module(irc).
+-include_lib("kernel/include/logger.hrl").
 
 -include_lib("gen_ircbot.hrl").
 
@@ -40,6 +41,7 @@ connect(Server) ->
 
 -spec send(Connection :: connection(), Data :: nonempty_string()) -> ok.
 send({SocketMod, Socket}, Data) ->
+    ?LOG_NOTICE("--> ~s", [Data]),
     SocketMod:send(Socket, Data ++ ?IRC_CRLF).
 
 -spec ping(Connection :: connection(), Server :: nonempty_string()) ->ok.
@@ -51,7 +53,7 @@ pong(Connection, Server) ->
     send(Connection, format_cmd(pong, ":~s", [Server])).
 
 -spec nick(Connection :: connection(), Nickname :: nonempty_string()) -> ok.
-nick(Connection, Nickname) -> 
+nick(Connection, Nickname) ->
     send(Connection, format_cmd(nick, "~s", [Nickname])).
 
 -spec join(Connection :: connection(), Channel :: nonempty_string()) -> ok.
@@ -74,16 +76,19 @@ connect_socket(#{host := Host, port := Port} = Server) ->
         true -> ssl;
         false -> gen_tcp
     end,
-
+    ?LOG_NOTICE("Connecting to server ~tp", [Server]),
     case SocketMod:connect(Host, Port, ?SOCKET_OPTS) of
         {ok, Socket} ->
+            ?LOG_NOTICE("Connected"),
             {ok, {SocketMod, Socket}};
-        {error, _Reason} -> % @todo Implement better backoff strategy with a max. retry count
+        {error, Reason} -> % @todo Implement better backoff strategy with a max. retry count
+            ?LOG_NOTICE("Error connecting to ~tp. Reason: ~tp", [Server, Reason]),
             timer:sleep(15000),
             connect_socket(Server)
     end.
 
 register_connection(#{username := Username, realname := Realname, nickname := Nickname} = Server, Connection) ->
+    ?LOG_NOTICE("Registering connection ~tp", [Server]),
     case maps:get(password, Server, undefined) of
         undefined -> ok;
         P -> send(Connection, format_cmd(pass, "~s", [P]))
@@ -100,7 +105,8 @@ register_connection(#{username := Username, realname := Realname, nickname := Ni
         false -> ok;
         I -> timer:apply_interval(I * 1000, ?MODULE, ping, [Connection, Realname])
     end,
-    
+    ?LOG_NOTICE("Registered"),
+
     ok.
 
 format_cmd(Command, Format, Args) when is_atom(Command) ->
