@@ -118,7 +118,7 @@ channels(Server) ->
     gen_server:call(Server, channels).
 
 privmsg(Server, Target, Message) ->
-    gen_server:call(Server, {privmsg, Target, Message}).
+    gen_server:cast(Server, {privmsg, Target, Message}).
 
 -spec reply(Server :: term(), ReplyTo :: irc:reply_to(), Message :: nonempty_string()) -> ok.
 reply(Server, ReplyTo, Message) ->
